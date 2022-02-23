@@ -1,0 +1,1 @@
+from .CustomMagics import splunk
