@@ -1,1 +1,1 @@
-from .CustomMagics import splunk
+from .CustomMagics import _last_query_result

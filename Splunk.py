@@ -48,7 +48,9 @@ def get_status(search_id):
         raise HTTPException("Splunk service returned status code: " + str(r.status_code))
 
 def fetch_result(search_id):
-    r = requests.get(_SEARCH_URL + "/{}/events".format(search_id), headers = bearer_header(_TOKEN), verify = False, params = { 'output_mode': 'json_rows' })
+    r = requests.get(_SEARCH_URL + "/{}/results".format(search_id), headers = bearer_header(_TOKEN), verify = False, params = { 
+        'output_mode': 'json_rows'
+         })
 
     if r.status_code == 200:
         return r.json()
