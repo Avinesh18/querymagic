@@ -1,40 +1,71 @@
 from IPython.core.magic import register_cell_magic, Magics, magics_class, cell_magic, needs_local_scope
 from IPython.display import display
-from .FetchResult import fetch_kusto, fetch_splunk
-from .FormatResponse import formatSplunkResponse
-from .Util import add_substitutions
+from .Splunk import execute as splunk_execute
+from .Kusto import execute as kusto_execute
+from .FormatResponse import formatResponse
 import threading
 import pandas
-import re as regex
+import re
 
 threadLock = threading.Lock()
-_last_query_result = ""
-SPLUNK_VALID_OUTPUT_MODES = ["df", "json", "table"]
+
+print("USING LOCAL QUERYMAGIC")
 
 class QueryResult:
     def __init__(self, type=None, query=None, result=None):
-        self._type = type
-        self._query = query
-        self._result = result
+        self.__type = type
+        self.__query = query
+        self.__result = result
 
     @property
     def type(self):
-        return self._type
+        return self.__type
 
     @property
     def query(self):
-        return self._query
+        return self.__query
 
     @property
     def result(self):
-        return self._result
+        return self.__result
     
-    def set(self, type, query, result):
-        self._type = type
-        self._query = query
-        self._result = result
+    def _set(self, type, query, result):
+        self.__type = type
+        self.__query = query
+        self.__result = result
 
 _last_query_result = QueryResult()
+
+def parse_parameters(parameters):
+    valid_parameters_regex = re.compile("^(-(\w+)([ ]+(\w+))?[ ]*)*$")
+    if valid_parameters_regex.match(parameters) == None:
+        raise Exception("invalid paramter string")
+
+    paramter_regex = re.compile("-(\w+)[ ]+(\w*)")
+    options = re.findall(paramter_regex, parameters)
+    paramter_map = {}
+    for option in options:
+        paramter_map[option[0]] = option[1]
+
+    return paramter_map
+
+# Any \val present in the query string is replaced by the value of identifier val
+# Any \\val present in the query string is replaced to \val
+def add_substitutions(query, local_ns):
+    open_braces_replaced = re.compile(r"{").sub("{{", query)
+    closed_braces_replaced = re.compile(r"}").sub("}}", open_braces_replaced)
+    
+    escaped_value_rgx = re.compile(r"(?:\s)\\(\w+)")
+    format_string = escaped_value_rgx.sub(" {}", closed_braces_replaced)
+    
+    substitution_values = []
+    for field in re.findall(escaped_value_rgx, query):
+        substitution_values.append(local_ns[field])
+        
+    substituted_string = format_string.format(*tuple(substitution_values))
+    
+    restored_escaped_backslash = re.compile(r"\\\\").sub(r"\\", substituted_string)
+    return restored_escaped_backslash
 
 @magics_class
 class QueryMagic(Magics):
@@ -44,22 +75,44 @@ class QueryMagic(Magics):
 
     @needs_local_scope
     @cell_magic
-    def splunk(self, line, cell, local_ns=None):
-        output_mode = "df"
-        options = regex.findall("-(\w+)[ ]+(\w*)", line)
-        for option in options:
-            if option[0] == 'out':
-                if option[1] in SPLUNK_VALID_OUTPUT_MODES:
-                    output_mode = option[1]
-
+    def splunk(self, line, cell, local_ns = None):
+        parameters = parse_parameters(line)
+        parameters['filename'] = local_ns['__file__'].split('.')[0]
         substituted_string = add_substitutions(cell, local_ns)
         try:
             threadLock.acquire()
-            result = fetch_splunk(substituted_string)
+            try:
+                result = splunk_execute(substituted_string)
+            except Exception as e:
+                print(e)
+                return
+
             global _last_query_result
-            _last_query_result.set("splunk", substituted_string, result)
-            display(formatSplunkResponse(result, output_mode))
-            # return formatSplunkResponse(result, output_mode)
+            _last_query_result._set("splunk", substituted_string, result)
+
+            display(formatResponse(result, parameters))
+        finally:
+            threadLock.release()
+
+    @needs_local_scope
+    @cell_magic
+    def kusto(self, line, cell, local_ns = None):
+        parameters = parse_parameters(line)
+        parameters['filename'] = local_ns['__file__'].split('.')[0]
+        substituted_string = add_substitutions(cell, local_ns)
+        try:
+            threadLock.acquire()
+            try:
+                result = kusto_execute(substituted_string)
+            except Exception as e:
+                print(e)
+                return
+
+            global _last_query_result
+            _last_query_result._set("kusto", substituted_string, result)
+
+            for i in range(len(result)):
+                display(formatResponse(result[i], parameters))
         finally:
             threadLock.release()
 

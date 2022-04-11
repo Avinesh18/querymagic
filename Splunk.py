@@ -1,5 +1,6 @@
 import os
 from dotenv import load_dotenv
+import time
 import requests
 from http.client import HTTPException
 
@@ -8,6 +9,7 @@ _TOKEN = os.getenv("SPLUNK_TOKEN")
 _SEARCH_URL = os.getenv("SPLUNK_SEARCH_URL")
 _MAX_COUNT = 100
 _STATUS_BUCKETS = 300
+_SPLUNK_SLEEP_SECONDS = 2
 id = 0
 
 if _TOKEN == None:
@@ -56,3 +58,26 @@ def fetch_result(search_id):
         return r.json()
     else:
         raise HTTPException("Splunk service returned status code: " + str(r.status_code))
+
+def execute(query):
+    search_id = send_request(query)
+
+    done_progress = 0
+    while done_progress != 1:
+        (done_progress, dispatch_state) = get_status(search_id)
+        print(dispatch_state)
+
+        if done_progress != 1:
+            time.sleep(_SPLUNK_SLEEP_SECONDS)
+    
+    print("Fetching Result")
+    json_response = fetch_result(search_id)
+    return format_splunk_response(json_response)
+
+
+
+def format_splunk_response(response):
+    formatted_response = {}
+    formatted_response['columns'] = response['fields']
+    formatted_response['rows'] = response['rows']
+    return formatted_response
