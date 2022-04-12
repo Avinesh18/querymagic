@@ -10,6 +10,7 @@ import re
 VALID_DATA_TYPES = ["bool", "boolean", "datetime", "date", "int", "long", "real", "double", "string", "timespan", "time", "decimal"]
 
 def dataframeToImage(df, options):
+    plt.figure(figsize = (10, 5), dpi = 80)
     ax = plt.subplot(111, frame_on=False)
     ax.xaxis.set_visible(False)
     ax.yaxis.set_visible(False)
@@ -51,6 +52,10 @@ def findType(data):
         return 'datetime'
     else:
         return 'string'
+        
+def formatRealDataSeries(data):
+    data = np.vectorize(lambda x: float(x))(data)
+    return data
 
 def formatBoolDataSeries(data):
     data = np.vectorize(lambda x: int(x))(data)
@@ -76,7 +81,9 @@ def formatDataSeries(data, type, allow_string):
     if type == 'string' and not(allow_string):
         raise Exception('cannot plot this type of data')
 
-    if type == 'bool':
+    if type == 'real':
+        data = formatRealDataSeries(data)
+    elif type == 'bool':
         data = formatBoolDataSeries(data)
     elif type == 'datetime':
         data = formatDateTimeDataSeries(data)
@@ -88,8 +95,8 @@ def formatRowsAndColumnsForPlotting(result, x_field, y_field):
     y_field_index = np.where(result['columns'] == y_field)[0][0]
     x_series = result['rows'][:, x_field_index]
     y_series = result['rows'][:, y_field_index]
-    x_series = formatDataSeries(x_series, result['column_types'][x_field_index] if type(result['column_types']).__name__ == 'NoneType' else None, True)
-    y_series = formatDataSeries(y_series, result['column_types'][y_field_index] if type(result['column_types']).__name__ == 'NoneType' else None, False)
+    x_series = formatDataSeries(x_series, None if type(result['column_types']).__name__ == 'NoneType' else result['column_types'][x_field_index], True)
+    y_series = formatDataSeries(y_series, None if type(result['column_types']).__name__ == 'NoneType' else result['column_types'][y_field_index], False)
     return (x_series, y_series)
 
 def plotChartAndSaveToFile(result, options):
@@ -109,6 +116,7 @@ def plotChartAndSaveToFile(result, options):
     (x_series, y_series) = formatRowsAndColumnsForPlotting(result, x_field, y_field)
     
     plt.figure(figsize = (10, 5), dpi = 80)
+    plt.xticks(rotation=70)
     plt.plot(x_series, y_series)
     plt.savefig(options['filename'] + ".png")
 
