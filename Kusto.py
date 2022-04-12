@@ -1,6 +1,7 @@
 from datetime import timedelta
 import os
 from dotenv import load_dotenv
+import numpy as np
 from azure.kusto.data import KustoClient, KustoConnectionStringBuilder, ClientRequestProperties
 from azure.kusto.data.exceptions import KustoServiceError
 from azure.kusto.data.helpers import dataframe_from_result_table
@@ -42,6 +43,7 @@ def execute(query):
 
 def format_kusto_response(response):
     formatted_response = {}
-    formatted_response['columns'] = list(map((lambda x: x['ColumnName']), response.raw_columns))
-    formatted_response['rows'] = response.raw_rows
+    formatted_response['columns'] = np.array(list(map((lambda x: x['ColumnName']), response.raw_columns)))
+    formatted_response['column_types'] = np.array(list(map((lambda x: x['ColumnType']), response.raw_columns)))
+    formatted_response['rows'] = np.array(response.raw_rows)
     return formatted_response

@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 import time
 import requests
 from http.client import HTTPException
+import numpy as np
 
 load_dotenv()
 _TOKEN = os.getenv("SPLUNK_TOKEN")
@@ -78,6 +79,7 @@ def execute(query):
 
 def format_splunk_response(response):
     formatted_response = {}
-    formatted_response['columns'] = response['fields']
-    formatted_response['rows'] = response['rows']
+    formatted_response['columns'] = np.array(response['fields'])
+    formatted_response['rows'] = np.array(response['rows'])
+    formatted_response['column_types'] = None
     return formatted_response
