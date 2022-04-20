@@ -10,12 +10,19 @@ import re
 VALID_DATA_TYPES = ["bool", "boolean", "datetime", "date", "int", "long", "real", "double", "string", "timespan", "time", "decimal"]
 
 def dataframeToImage(df, options):
-    plt.figure(figsize = (10, 5), dpi = 80)
     ax = plt.subplot(111, frame_on=False)
     ax.xaxis.set_visible(False)
     ax.yaxis.set_visible(False)
-    table(ax, df, loc='center')
-    plt.savefig(options['filename'] + ".png")
+
+    df_table = table(ax, df, loc='center')
+    df_table.scale(1, 1.5)
+    df_table.set(fontsize = 'medium')
+
+    cells = df_table.get_celld()
+    for cell_loc in cells:
+        cells[cell_loc].set_text_props(verticalalignment = 'center', horizontalalignment = 'center')
+
+    plt.savefig(options['filename'] + ".png", bbox_inches = 'tight')
 
 def validDateString(string):
     try:
@@ -52,7 +59,7 @@ def findType(data):
         return 'datetime'
     else:
         return 'string'
-        
+
 def formatRealDataSeries(data):
     data = np.vectorize(lambda x: float(x))(data)
     return data
@@ -118,7 +125,7 @@ def plotChartAndSaveToFile(result, options):
     plt.figure(figsize = (10, 5), dpi = 80)
     plt.xticks(rotation=70)
     plt.plot(x_series, y_series)
-    plt.savefig(options['filename'] + ".png")
+    plt.savefig(options['filename'] + ".png", bbox_inches = 'tight')
 
 def formatResponse(result, options):
     print(options)
