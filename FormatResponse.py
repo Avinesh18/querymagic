@@ -8,21 +8,61 @@ from dateutil.parser import parse
 import re
 
 VALID_DATA_TYPES = ["bool", "boolean", "datetime", "date", "int", "long", "real", "double", "string", "timespan", "time", "decimal"]
+MAX_CHARACTERS_IN_ONE_LINE = 30
+
+def break_text_into_lines(text):
+    return '\n'.join(text[i:i+MAX_CHARACTERS_IN_ONE_LINE] for i in range(0, len(text), MAX_CHARACTERS_IN_ONE_LINE))
 
 def dataframeToImage(df, options):
-    ax = plt.subplot(111, frame_on=False)
+    fig, ax = plt.subplots()
+    ax.set(frame_on = False)
     ax.xaxis.set_visible(False)
     ax.yaxis.set_visible(False)
 
     df_table = table(ax, df, loc='center')
-    df_table.scale(1, 1.5)
+    df_table.scale(3.5, 1.5)
     df_table.set(fontsize = 'medium')
 
     cells = df_table.get_celld()
-    for cell_loc in cells:
-        cells[cell_loc].set_text_props(verticalalignment = 'center', horizontalalignment = 'center')
 
-    plt.savefig(options['filename'] + ".png", bbox_inches = 'tight')
+    # Calculating and setting correct height for column labels
+    height_multiplier = 1
+    for j in range(0, len(df.columns)):
+        cell = cells[(0, j)]
+        cell_text = cell.get_text().get_text()
+        cell_height = cell.get_height()
+        height_multiplier = max(height_multiplier, len(cell_text) / MAX_CHARACTERS_IN_ONE_LINE + cell_text.count('\n'))
+        cell.set_text_props(verticalalignment = 'center', horizontalalignment = 'center')
+
+        if len(cell_text) > MAX_CHARACTERS_IN_ONE_LINE:
+            cell_text = break_text_into_lines(cell_text)
+            cell.set_text_props(text = cell_text)
+
+    for j in range(0, len(df.columns)):
+        cell = cells[(0, j)]
+        cell_height = cell.get_height()
+        cell.set(height = cell_height * height_multiplier)
+
+    #Calcuating and setting correct height for other rows
+    for i in range(1, len(df.index) + 1):
+        height_multiplier = 1
+        for j in range(-1, len(df.columns)):
+            cell = cells[(i, j)]
+            cell_text = cell.get_text().get_text()
+            cell_height = cell.get_height()
+            height_multiplier = max(height_multiplier, len(cell_text) / MAX_CHARACTERS_IN_ONE_LINE + cell_text.count('\n'))
+            cell.set_text_props(verticalalignment = 'center', horizontalalignment = 'center')
+
+            if len(cell_text) > MAX_CHARACTERS_IN_ONE_LINE:
+                cell_text = break_text_into_lines(cell_text)
+                cell.set_text_props(text = cell_text)
+        
+        for j in range(-1, len(df.columns)):
+            cell = cells[(i, j)]
+            cell_height = cell.get_height()
+            cell.set(height = cell_height * height_multiplier)
+
+    return fig
 
 def validDateString(string):
     try:
@@ -106,15 +146,15 @@ def formatRowsAndColumnsForPlotting(result, x_field, y_field):
     y_series = formatDataSeries(y_series, None if type(result['column_types']).__name__ == 'NoneType' else result['column_types'][y_field_index], False)
     return (x_series, y_series)
 
-def plotChartAndSaveToFile(result, options):
+def plotChart(result, options):
     chart_type = options['chart'] if 'chart' in options else 'linechart'
     x_field = None if not('x' in options) else options['x']
     y_field = None if not('y' in options) else options['y']
 
     result_has_x_field = x_field != None and x_field in result['columns']
     result_has_y_field = y_field != None and y_field in result['columns']
-    if chart_type == '' or not(result_has_x_field) or not(result_has_y_field):
-        print("Can't plot chart, saving a table instead")
+    if not(result_has_x_field) or not(result_has_y_field):
+        print("Can't plot chart, generating a table instead")
         print(chart_type)
         print(x_field, result_has_x_field)
         print(y_field, result_has_y_field)
@@ -122,17 +162,35 @@ def plotChartAndSaveToFile(result, options):
 
     (x_series, y_series) = formatRowsAndColumnsForPlotting(result, x_field, y_field)
     
-    plt.figure(figsize = (10, 5), dpi = 80)
-    plt.xticks(rotation=70)
-    plt.plot(x_series, y_series)
-    plt.savefig(options['filename'] + ".png", bbox_inches = 'tight')
+    fig, ax = plt.subplots(figsize = (10, 5), dpi = 80)
+
+    if chart_type == 'barchart':
+        ax.bar(x_series, y_series)
+    elif chart_type == 'piechart':
+        ax.pie(y_series, labels=x_series, startangle=90, autopct='%.1f%%')
+    elif chart_type == 'scatterplot':
+        ax.scatter(x_series, y_series)
+    else:
+        ax.plot(x_series, y_series)
+    
+    ax.tick_params(axis = 'x', labelrotation = 70)
+    ax.grid(axis='y')
+
+    # print("Saving to:", options['filename'] + ".png")
+    # fig.savefig(options['filename'] + ".png", bbox_inches = 'tight')
+    return fig
 
 def formatResponse(result, options):
     print(options)
+    fig = None
     
-    if not('out' in options) or options['out'] == 'table':
+    if not('out' in options):
+        print("Displaying dataframe")
+        display(pandas.DataFrame(result['rows'], columns = result['columns']))
+
+    elif options['out'] == 'table':
         print("Saving dataframe to image")
-        dataframeToImage(pandas.DataFrame(result['rows'], columns = result['columns']), options)
+        fig = dataframeToImage(pandas.DataFrame(result['rows'], columns = result['columns']), options)
 
     elif options['out'] == "raw":
         print("Displaying raw result")
@@ -140,12 +198,10 @@ def formatResponse(result, options):
 
     elif options['out'] == 'chart':
         print("Saving chart")
-        plotChartAndSaveToFile(result, options)
-
-    elif options['out'] == "df":
-        print("Displaying dataframe")
-        display(pandas.DataFrame(result['rows'], columns = result['columns']))
+        fig = plotChart(result, options)
 
     else:
         print("Invalid out parameter. Saving dataframe as png")
-        dataframeToImage(pandas.DataFrame(result['rows'], columns = result['columns']), options)
+        fig = dataframeToImage(pandas.DataFrame(result['rows'], columns = result['columns']), options)
+
+    return fig
