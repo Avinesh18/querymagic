@@ -125,16 +125,16 @@ def plotChart(result, options):
 
     no_y_series = 0
     labels = []
+    y_series = []
     if not('y' in options):
         while 'y' + str(no_y_series+1) in options:
+            y_series.append(getSeries(result, options['y' + str(no_y_series + 1), False]))
             labels.append(options['y' + str(no_y_series + 1)])
             no_y_series+=1
     else:
         no_y_series = 1
+        y_series.append(getSeries(result, options['y'], False))
         labels.append(options['y'])
-    y_series = []
-    for i in range(no_y_series):
-        y_series.append(getSeries(result, options['y' + str(i+1)], False))
     
     fig, ax = plt.subplots(figsize = (10, 5), dpi = 80)
 

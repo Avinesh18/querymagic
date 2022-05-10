@@ -21,10 +21,6 @@ if _CLIENT_SECRET == None:
 if _TENANT_ID == None:
     raise Exception("Kusto Tenant ID not found")
 
-print(_CLIENT_ID)
-print(_CLIENT_SECRET)
-print(_TENANT_ID)
-
 
 def execute(query):
     kcsb = KustoConnectionStringBuilder.with_aad_application_key_authentication(_CLUSTER, _CLIENT_ID, _CLIENT_SECRET, _TENANT_ID)
