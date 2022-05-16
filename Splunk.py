@@ -25,13 +25,16 @@ if _PASSWORD == None:
 
 print(_SEARCH_URL)
 print(_USERNAME)
-print(_PASSWORD)
+
+# _TOKEN = os.getenv("SPLUNK_TOKEN")
+
 
 def bearer_header(token):
     return { "Authorization": "Bearer " + token }
 
 def basic_auth(username, password):
     return { "Authorization": "Basic " + base64.b64encode((username + ":" + password).encode('utf-8')).decode('utf-8') }
+    # return { "Authorization": "Bearer " + _TOKEN }
 
 def send_request(query):
     global id
@@ -41,7 +44,8 @@ def send_request(query):
         "id": searchId,
         "search": "search " + query,
         "max_count": _MAX_COUNT,
-        "status_buckets": _STATUS_BUCKETS
+        "status_buckets": _STATUS_BUCKETS,
+        "earliest_time": "-h"
     }
 
     print("Sending Search Request")
@@ -57,7 +61,6 @@ def send_request(query):
 
 
 def get_status(search_id):
-    print("Getting Status:", end='')
     r = requests.get(_SEARCH_URL + "/{}".format(search_id), headers = basic_auth(_USERNAME, _PASSWORD), params = { 'output_mode': 'json' }, verify = False)
     
     if r.status_code == 200:
@@ -69,7 +72,6 @@ def get_status(search_id):
         raise HTTPException("Splunk service returned status code: " + str(r.status_code))
 
 def fetch_result(search_id):
-    print("Fetching result")
     r = requests.get(_SEARCH_URL + "/{}/results".format(search_id), headers = basic_auth(_USERNAME, _PASSWORD), verify = False, params = { 
         'output_mode': 'json_rows'
          })

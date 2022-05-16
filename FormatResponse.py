@@ -13,7 +13,7 @@ def formatResponse(result, options):
 
     elif options['out'] == 'table':
         print("Saving dataframe to image")
-        fig = generateTable(pandas.DataFrame(result['rows'], columns = result['columns']), options)
+        fig = generateTable(result, options)
 
     elif options['out'] == "raw":
         print("Displaying raw result")
@@ -25,6 +25,6 @@ def formatResponse(result, options):
 
     else:
         print("Invalid out parameter. Saving dataframe as png")
-        fig = generateTable(pandas.DataFrame(result['rows'], columns = result['columns']), options)
+        fig = generateTable(result, options)
 
     return fig

@@ -5,6 +5,8 @@ import pandas
 import re
 from .Table import generateTable
 
+count = 1
+
 def validDateString(string):
     try:
         parse(string)
@@ -118,7 +120,7 @@ def plotChart(result, options):
     valid, comment = validateInputParameters(result, options)
     if not(valid):
         print(comment)
-        return generateTable(pandas.DataFrame(result['rows'], columns = result['columns']), options)
+        return generateTable(result, options)
 
     # (x_series, y_series) = formatRowsAndColumnsForPlotting(result, column_x, column_y)
     x_series = getSeries(result, options['x'], True)
@@ -128,7 +130,7 @@ def plotChart(result, options):
     y_series = []
     if not('y' in options):
         while 'y' + str(no_y_series+1) in options:
-            y_series.append(getSeries(result, options['y' + str(no_y_series + 1), False]))
+            y_series.append(getSeries(result, options['y' + str(no_y_series + 1)], False))
             labels.append(options['y' + str(no_y_series + 1)])
             no_y_series+=1
     else:
@@ -147,7 +149,7 @@ def plotChart(result, options):
 
     elif chart_type == 'scatterplot':
         for i in range(no_y_series):
-            ax.scatter(x_series, y_series[i])
+            ax.scatter(x_series, y_series[i], label = labels[i])
 
     else:
         for i in range(no_y_series):
@@ -157,4 +159,9 @@ def plotChart(result, options):
     ax.grid(axis='y')
     ax.legend(loc = 'upper right')
 
-    return fig
+    global count
+    filename = options['title'] if 'title' in options else 'chart' + str(count) + '.png'
+    count += 1 
+
+    fig.suptitle(options['title'] if 'title' in options else '')
+    fig.savefig(filename, bbox_inches = 'tight')
