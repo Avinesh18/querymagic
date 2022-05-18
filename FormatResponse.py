@@ -1,25 +1,30 @@
 import pandas
-import matplotlib.pyplot as plt
-from pandas.plotting import table
+from IPython.display import display
+from .Table import generateTable
+from .Chart import plotChart
 
 def formatResponse(result, options):
-    if ~('out' in options) or options['out'] == 'df':
-        return pandas.DataFrame(result['rows'], columns = result['columns'])
-        # dataframeToImage(pandas.DataFrame(result['rows'], columns = result['columns']), options)
+    print(options)
+    fig = None
+    
+    if not('out' in options):
+        print("Displaying dataframe")
+        display(pandas.DataFrame(result['rows'], columns = result['columns']))
+
+    elif options['out'] == 'table':
+        print("Saving dataframe to image")
+        fig = generateTable(result, options)
+
     elif options['out'] == "raw":
-        return result
-    elif options['out'] == "table":
-        return generateTable()
+        print("Displaying raw result")
+        display(result)
+
+    elif options['out'] == 'chart':
+        print("Saving chart")
+        fig = plotChart(result, options)
+
     else:
-        return pandas.DataFrame(result['rows'], columns = result['columns'])
+        print("Invalid out parameter. Saving dataframe as png")
+        fig = generateTable(result, options)
 
-def generateTable():
-    # TODO
-    pass
-
-def dataframeToImage(df, options):
-    ax = plt.subplot(111, frame_on=False)
-    ax.xaxis.set_visible(False)
-    ax.yaxis.set_visible(False)
-    table(ax, df, loc='center')
-    plt.savefig(options['filename'] + ".png")
+    return fig
