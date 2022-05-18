@@ -160,7 +160,7 @@ def plotChart(result, options):
     ax.legend(loc = 'upper right')
 
     global count
-    filename = options['title'] if 'title' in options else 'chart' + str(count) + '.png'
+    filename = 'chart' + str(count) + ".png"
     count += 1 
 
     fig.suptitle(options['title'] if 'title' in options else '')

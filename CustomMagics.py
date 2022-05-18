@@ -44,15 +44,15 @@ class QueryResult:
 _last_query_result = QueryResult()
 
 def parse_parameters(parameters):
-    valid_parameters_regex = re.compile("^(-(\w+)([ ]+(\w+))?[ ]*)*$")
-    if valid_parameters_regex.match(parameters) == None:
+    valid_parameters_regex = re.compile("^(?:-\w+(?:[ ]+|$)(?:\w+|\"[^\"]*\")?(?:[ ]+|$))*")
+    if valid_parameters_regex.fullmatch(parameters) == None:
         raise Exception("invalid paramter string")
 
-    paramter_regex = re.compile("-(\w+)[ ]+(\w*)")
+    paramter_regex = re.compile("-(\w+)(?:[ ]+|$)(\w+|\"[^\"]*\")?")
     options = re.findall(paramter_regex, parameters)
     paramter_map = {}
     for option in options:
-        paramter_map[option[0]] = option[1]
+        paramter_map[option[0]] = option[1].replace("\"", "")
 
     return paramter_map
 
