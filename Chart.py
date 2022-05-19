@@ -3,9 +3,48 @@ import matplotlib.pyplot as plt
 from dateutil.parser import parse
 import pandas
 import re
-from .Table import generateTable
 
 count = 1
+
+class ChartProperties:
+    pass
+
+def getProperties(options):
+    chart_properties = ChartProperties()
+    chart_properties.x = options['x'] if 'x' in options else None
+    chart_properties.type = options['chart'] if 'chart' in options else 'linechart'
+    chart_properties.group = options['groupBy'] if 'groupBy' in options else None
+    chart_properties.title = options['title'] if 'title' in options else ''
+
+
+    if 'y1' in options:
+        count = 1
+        chart_properties.y = []
+        while 'y' + str(count) in options:
+            chart_properties.y.append(options['y' + str(count)])
+            count += 1
+    else:
+        chart_properties.y = [options['y']] if 'y' in options else []
+
+    if chart_properties.x == None or len(chart_properties.y) == 0:
+        return None
+    return chart_properties
+
+def columnExists(result, name):
+    return name in result['columns']
+
+def isBool(series):
+    for e in series:
+        if e != True and e != False:
+            return False
+    return True
+
+def isNumber(series):
+    num_regex = re.compile("^\d+([.]\d+)?$")
+    for e in series:
+        if re.match(num_regex, e) == None:
+            return False
+    return True
 
 def validDateString(string):
     try:
@@ -14,50 +53,37 @@ def validDateString(string):
         return False
     return True
 
-def isBool(data):
-    for e in data:
-        if e != True and e != False:
-            return False
-    return True
-
-def isNumber(data):
-    num_regex = re.compile("^\d+([.]\d+)?$")
-    for e in data:
-        if re.match(num_regex, e) == None:
-            return False
-    return True
-
-def isDateTime(data):
-    for e in data:
+def isDateTime(series):
+    for e in series:
         if not(validDateString(e)):
             return False
     return True
 
-def findType(data):
-    if isBool(data):
+def findType(series):
+    if isBool(series):
         return 'bool'
-    elif isNumber(data):
+    elif isNumber(series):
         return 'real'
-    elif isDateTime(data):
+    elif isDateTime(series):
         return 'datetime'
     else:
         return 'string'
 
-def formatRealDataSeries(data):
-    data = np.vectorize(lambda x: float(x))(data)
-    return data
+def formatRealSeries(series):
+    series = np.vectorize(lambda x: float(x))(series)
+    return series
 
-def formatBoolDataSeries(data):
-    data = np.vectorize(lambda x: int(x))(data)
-    return data
+def formatBoolSeries(series):
+    series = np.vectorize(lambda x: int(x))(series)
+    return series
 
-def formatDateTimeDataSeries(data):
-    data = np.vectorize(lambda x: parse(x))(data)
-    return data
+def formatDateTimeSeries(series):
+    series = np.vectorize(lambda x: parse(x))(series)
+    return series
 
-def formatDataSeries(data, type, allow_string):
+def formatSeries(series, type):
     if type == None:
-        type = findType(data)
+        type = findType(series)
     
     if type == 'boolean':
         type = 'bool'
@@ -66,102 +92,108 @@ def formatDataSeries(data, type, allow_string):
     elif type == 'int' or type == 'long' or type == 'double':
         type = 'real'
 
-    print("Series Type:", type)
-    
-    if type == 'string' and not(allow_string):
-        raise Exception('cannot plot this type of data')
-
     if type == 'real':
-        data = formatRealDataSeries(data)
+        series = formatRealSeries(series)
     elif type == 'bool':
-        data = formatBoolDataSeries(data)
+        series = formatBoolSeries(series)
     elif type == 'datetime':
-        data = formatDateTimeDataSeries(data)
+        series = formatDateTimeSeries(series)
     
-    return data
+    return series, type
 
-# def formatRowsAndColumnsForPlotting(result, x_field, y_field):
-#     x_field_index = np.where(result['columns'] == x_field)[0][0]
-#     y_field_index = np.where(result['columns'] == y_field)[0][0]
-
-#     x_series = np.array(result['rows'])[:, x_field_index]
-#     y_series = np.array(result['rows'])[:, y_field_index]
-
-#     x_series = formatDataSeries(x_series, None if type(result['column_types']).__name__ == 'NoneType' else result['column_types'][x_field_index], True)
-#     y_series = formatDataSeries(y_series, None if type(result['column_types']).__name__ == 'NoneType' else result['column_types'][y_field_index], False)
-
-#     return (x_series, y_series)
-
-def getSeries(result, name, allow_string):
+def getSeries(result, name):
     index = np.where(result['columns'] == name)[0][0]
     series = np.array(result['rows'])[:, index]
-    return formatDataSeries(series, None if type(result['column_types']).__name__ == 'NoneType' else result['column_types'][index], allow_string)
+    series_type = None if type(result['column_types']).__name__ == 'NoneType' else result['column_types'][index]
+    return formatSeries(series, series_type)
 
-def validateInputParameters(result, options):
-    x_name = None if not('x' in options) else options['x']
-    if not(x_name in result['columns']):
-        return False, "Invalid x parameter"
+def matrixColumn(array, index):
+    return [array[i][index] for i in range(len(array))]
 
-    if 'y1' in options:
-        i = 1
-        while ('y' + str(i)) in options:
-            y_name = options['y' + str(i)]
-            if not(y_name in result['columns']):
-                return False, "Invalid y" + str(i) + " parameter"
-            i += 1
+def getAllSeries(result, properties):
+    series = []
+
+    if not(columnExists(result, properties.x)):
+        return None, "Invalid x parameter"
+    for y_name in properties.y:
+        if not(columnExists(result, y_name)):
+            return None, "Invalid y parameter"
+
+    x_series, x_type = getSeries(result, properties.x)
+
+    if x_type != 'real' and x_type != 'datetime':
+        for y_name in properties.y:
+            y_series, y_type = getSeries(result, y_name)
+            if y_type == 'string':
+                return None, "y series cannot be string"
+
+            series.append((x_series.copy(), y_series, y_name))
+        return series, None
     else:
-        y_name = None if not('y' in options) else options['y']
-        if y_name != None and not(x_name in result['columns']):
-            return False, "Invalid y paramter"
-    return True, ""
+        y_index = []
+        y_types = []
+        for y_name in properties.y:
+            y_index.append(np.where(result['columns'] == y_name)[0][0])
+            y_types.append(result['column_types'][y_index[-1]] if type(result['column_types']).__name__ != 'NoneType' else None)
+        
+        aggregate_series = []
+        for i in range(len(x_series)):
+            row = [x_series[i]]
+            for index in y_index:
+                row.append(result['rows'][i][index])
+            aggregate_series.append(row)
+
+        if x_type == 'real':
+            aggregate_series.sort(key = lambda x: x[0])
+        elif x_type == 'datetime':
+            aggregate_series.sort(key = lambda x: x[0].timestamp())
+
+        x_series = matrixColumn(aggregate_series, 0)
+        for i in range(1, len(aggregate_series[0])):
+            y_series, y_type = formatSeries(matrixColumn(aggregate_series, i), y_types[i-1])
+            if y_type == 'string':
+                return None, "y series cannot be string"
+            series.append((x_series.copy(), y_series, properties.y[i-1]))
+
+        return series, None
+
+
 
 def plotChart(result, options):
-    chart_type = options['chart'] if 'chart' in options else 'linechart'
-    valid, comment = validateInputParameters(result, options)
-    if not(valid):
-        print(comment)
-        return generateTable(result, options)
+    properties = getProperties(options)
+    series, error = getAllSeries(result, properties)
+    if error != None:
+        print(error)
+        return
 
-    # (x_series, y_series) = formatRowsAndColumnsForPlotting(result, column_x, column_y)
-    x_series = getSeries(result, options['x'], True)
+    if properties.group != None:
+        if len(series) > 1:
+            pass
 
-    no_y_series = 0
-    labels = []
-    y_series = []
-    if not('y' in options):
-        while 'y' + str(no_y_series+1) in options:
-            y_series.append(getSeries(result, options['y' + str(no_y_series + 1)], False))
-            labels.append(options['y' + str(no_y_series + 1)])
-            no_y_series+=1
-    else:
-        no_y_series = 1
-        y_series.append(getSeries(result, options['y'], False))
-        labels.append(options['y'])
-    
     fig, ax = plt.subplots(figsize = (10, 5), dpi = 80)
+    if properties.type == 'barchart':
+        for element in series:
+            ax.bar(element[0], element[1], label = element[2])
 
-    if chart_type == 'barchart':
-        for i in range(no_y_series):
-            ax.bar(x_series, y_series[i])
+    elif properties.type == 'piechart':
+        ax.pie(series[0][1], labels = series[0][0], startangle = 90, autopct = '%.1f%%')
 
-    elif chart_type == 'piechart':
-        ax.pie(y_series, labels=x_series, startangle=90, autopct='%.1f%%')
-
-    elif chart_type == 'scatterplot':
-        for i in range(no_y_series):
-            ax.scatter(x_series, y_series[i], label = labels[i])
+    elif properties.type == 'scatterplot':
+        for element in series:
+            ax.scatter(element[0], element[1], label = element[2])
 
     else:
-        for i in range(no_y_series):
-            ax.plot(x_series, y_series[i], label = labels[i])
-    
+        for element in series:
+            ax.plot(element[0], element[1], label = element[2])
+
     ax.tick_params(axis = 'x', labelrotation = 70)
-    ax.grid(axis='y')
-    ax.legend(loc = 'upper right')
+    ax.grid(axis = 'y')
+    if properties.type != 'piechart':
+        ax.legend(loc = 'upper right')
+
+    fig.suptitle(properties.title)
 
     global count
     filename = 'chart' + str(count) + ".png"
-    count += 1 
-
-    fig.suptitle(options['title'] if 'title' in options else '')
+    count += 1
     fig.savefig(filename, bbox_inches = 'tight')
