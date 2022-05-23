@@ -12,7 +12,7 @@ class ChartProperties:
 def getProperties(options):
     chart_properties = ChartProperties()
     chart_properties.x = options['x'] if 'x' in options else None
-    chart_properties.type = options['chart'] if 'chart' in options else 'linechart'
+    chart_properties.type = options['type'] if 'type' in options else 'linechart'
     chart_properties.group = options['groupBy'] if 'groupBy' in options else None
     chart_properties.title = options['title'] if 'title' in options else ''
 
@@ -27,8 +27,10 @@ def getProperties(options):
         chart_properties.y = [options['y']] if 'y' in options else []
 
     if chart_properties.x == None or len(chart_properties.y) == 0:
-        return None
-    return chart_properties
+        return None, "Need x and y parameters"
+    if chart_properties.group != None and len(chart_properties.y) > 1:
+        return None, "Grouping possible only with single y series"
+    return chart_properties, None
 
 def columnExists(result, name):
     return name in result['columns']
@@ -110,6 +112,49 @@ def getSeries(result, name):
 def matrixColumn(array, index):
     return [array[i][index] for i in range(len(array))]
 
+def getGroupedSeries(result, properties):
+    if not(columnExists(result, properties.x)):
+        return None, "Invlaid x parameter"
+    if not(columnExists(result, properties.y[0])):
+        return None, "Invalid y parameter"
+    if not(columnExists(result, properties.group)):
+        return None, "Invalid groupBy parameter"
+
+    x_series, x_type = getSeries(result, properties.x)
+
+    y_index = np.where(result['columns'] == properties.y[0])[0][0]
+    y_type = None if type(result['column_types']).__name__ == 'NoneType' else result['column_types'][y_index]
+    if y_type == 'string':
+        return None, "y series cannot be string"
+
+    group_column_index = np.where(result['columns'] == properties.group)[0][0]
+    groups = {}
+    for i in range(len(x_series)):
+        group = result['rows'][i][group_column_index]
+        if group in groups:
+            groups[group].append([x_series[i], result['rows'][i][y_index]])
+        else:
+            groups[group] = [[x_series[i], result['rows'][i][y_index]]]
+
+    series = []
+    for group in groups.keys():
+        group_series = groups[group]
+        if x_type != 'real' and x_type != 'datetime':
+            formatted_y, _ = formatSeries(matrixColumn(group_series, 1), y_type)
+            series.append((matrixColumn(group_series, 0), formatted_y, group))
+
+        elif x_type == 'real':
+            group_series.sort(key = lambda x: x[0])
+            formatted_y, _ = formatSeries(matrixColumn(group_series, 1), y_type)
+            series.append((matrixColumn(group_series, 0), formatted_y, group))
+
+        elif x_type == 'datetime':
+            group_series.sort(key = lambda x: x[0].timestamp())
+            formatted_y, _ = formatSeries(matrixColumn(group_series, 1), y_type)
+            series.append((matrixColumn(group_series, 0), formatted_y, group))
+
+    return series, None
+
 def getAllSeries(result, properties):
     series = []
 
@@ -160,15 +205,21 @@ def getAllSeries(result, properties):
 
 
 def plotChart(result, options):
-    properties = getProperties(options)
-    series, error = getAllSeries(result, properties)
+    properties, error = getProperties(options)
     if error != None:
         print(error)
         return
 
+    series = None
+    error = None
     if properties.group != None:
-        if len(series) > 1:
-            pass
+        series, error = getGroupedSeries(result, properties)
+    else:
+        series, error = getAllSeries(result, properties)
+    
+    if error != None:
+        print(error)
+        return
 
     fig, ax = plt.subplots(figsize = (10, 5), dpi = 80)
     if properties.type == 'barchart':

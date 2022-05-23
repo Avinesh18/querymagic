@@ -1,10 +1,8 @@
 from pandas.plotting import table
+from .Util import save_table
 
 MAX_CHARACTERS_IN_ONE_LINE = 30
 count = 1
-
-def break_text_into_lines(text):
-    return '\n'.join(text[i:i+MAX_CHARACTERS_IN_ONE_LINE] for i in range(0, len(text), MAX_CHARACTERS_IN_ONE_LINE))
 
 def getTexTable(rows, columns, title = ""):
     tex_begin = """\\documentclass[landscape]{article}
@@ -41,16 +39,21 @@ def getTexTable(rows, columns, title = ""):
 def generateTable(result, options):
 
     global count
-    title = options['title'] if 'title' in options else 'table' + str(count)
+    title = None
+    if title in options:
+        title = options['title']
+    else:
+        title = 'table' + str(count)
+        count += 1
     tex_source = getTexTable(result['rows'], result['columns'], title)
 
-    filename = "table" + str(count) + ".tex"
-    count += 1
+    filename = title + '.tex'
     try:
         f = open(filename, "w")
         f.write(tex_source)
     finally:
         f.close()
+
 
 # def generateTable(result, options):
 #     df = pandas.DataFrame(result['rows'], columns = result['columns'])

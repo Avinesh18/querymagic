@@ -23,18 +23,20 @@ if _USERNAME == None:
 if _PASSWORD == None:
     raise Exception("Splunk password not found")
 
+_SEARCH_URL = "https://93ec-2405-201-6001-c107-78b1-aad3-4afd-c539.in.ngrok.io//services/search/jobs"
+
 print(_SEARCH_URL)
 print(_USERNAME)
 
-# _TOKEN = os.getenv("SPLUNK_TOKEN")
+_TOKEN = os.getenv("SPLUNK_TOKEN")
 
 
 def bearer_header(token):
     return { "Authorization": "Bearer " + token }
 
 def basic_auth(username, password):
-    return { "Authorization": "Basic " + base64.b64encode((username + ":" + password).encode('utf-8')).decode('utf-8') }
-    # return { "Authorization": "Bearer " + _TOKEN }
+    # return { "Authorization": "Basic " + base64.b64encode((username + ":" + password).encode('utf-8')).decode('utf-8') }
+    return { "Authorization": "Bearer " + _TOKEN }
 
 def send_request(query):
     global id
@@ -45,7 +47,9 @@ def send_request(query):
         "search": "search " + query,
         "max_count": _MAX_COUNT,
         "status_buckets": _STATUS_BUCKETS,
-        "earliest_time": "-h"
+        # "earliest_time": "1650420900",
+        # "latest_time": "1650542340",
+        # "earliest_time": "-24h",
     }
 
     print("Sending Search Request")
