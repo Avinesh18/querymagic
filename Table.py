@@ -1,5 +1,5 @@
 from pandas.plotting import table
-from .Util import save_table
+from .Util import valid_filename
 
 MAX_CHARACTERS_IN_ONE_LINE = 30
 count = 1
@@ -37,7 +37,6 @@ def getTexTable(rows, columns, title = ""):
     return tex_table
 
 def generateTable(result, options):
-
     global count
     title = None
     if title in options:
@@ -45,9 +44,14 @@ def generateTable(result, options):
     else:
         title = 'table' + str(count)
         count += 1
+
     tex_source = getTexTable(result['rows'], result['columns'], title)
 
-    filename = title + '.tex'
+    if valid_filename(title):
+        filename = title + '.tex'
+    else:
+        filename = 'table' + str(count) + '.tex'
+        count += 1
     try:
         f = open(filename, "w")
         f.write(tex_source)

@@ -1,8 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from dateutil.parser import parse
-import pandas
 import re
+from .Util import valid_filename
 
 count = 1
 
@@ -245,6 +245,9 @@ def plotChart(result, options):
     fig.suptitle(properties.title)
 
     global count
-    filename = 'chart' + str(count) + ".png"
-    count += 1
+    if properties.title != '' and valid_filename(properties.title):
+        filename = properties.title + '.png'
+    else:
+        filename = 'chart' + str(count) + '.png'
+        count += 1
     fig.savefig(filename, bbox_inches = 'tight')
